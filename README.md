@@ -111,17 +111,41 @@ cd Optimisation-de-la-Cha-ne-d-Approvisionnement
 pip install -r requirements.txt
 
 # Configurer l'environnement
-cp .env.example .env
+copy .env.example .env  # Windows PowerShell
+# or
+cp .env.example .env    # POSIX shells
 # Éditer .env avec vos configurations
 
-# Lancer l'infrastructure Docker
+# Lancer l'infrastructure Docker (si nécessaire)
 docker-compose up -d
 
-# Initialiser la base de données
+# Initialiser la base de données (si présent)
 python src/setup/init_database.py
 
-# Démarrer l'application
-python src/main.py
+# --- IMPORTANT: run the app as a module to preserve package relative imports ---
+
+# Recommended (cross-platform): use the provided launcher script
+# Windows PowerShell (from repo root):
+./run.ps1
+
+# POSIX / macOS / WSL:
+./run.sh
+
+# Or run directly as a module (keeps relative imports working):
+# Python built-in module execution (cross-platform):
+# python -m src.main
+
+# Preferred development workflow
+# Windows (activate venv and run convenience script):
+./start.ps1
+
+# Windows manual (activate venv then run launcher):
+# .venv\Scripts\Activate.ps1
+# .\run.ps1
+
+# POSIX / macOS / WSL (activate venv then run launcher):
+# source .venv/bin/activate
+# ./run.sh
 ```
 
 ## 📊 Dashboard et visualisation

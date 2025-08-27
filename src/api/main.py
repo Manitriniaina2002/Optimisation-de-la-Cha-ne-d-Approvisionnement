@@ -13,8 +13,8 @@ import logging
 from contextlib import asynccontextmanager
 
 # Import des routes
-from api.routes import api_router
-from utils.logger import setup_logger
+from .routes import api_router
+from ..utils.logger import setup_logger
 
 # Configuration du logger
 logger = setup_logger(__name__)
@@ -319,10 +319,10 @@ async def cleanup_services():
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     # Configuration pour le développement
     uvicorn.run(
-        "api.main:app",
+        "src.api.main:app",
         host="0.0.0.0",
         port=8000,
         reload=True,

@@ -17,20 +17,42 @@ import logging
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-import xgboost as xgb
-from prophet import Prophet
 
-# Deep Learning
-import tensorflow as tf
-from tensorflow.keras.models import Sequential, load_model
-from tensorflow.keras.layers import LSTM, Dense, Dropout, BatchNormalization
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
+# Heavy ML libraries are imported lazily inside methods to avoid import-time
+# side effects (e.g. xgboost importing dask which may interact badly at import time).
+_xgb = None
+_Prophet = None
+_tf = None
+_keras_LoadModel = None
+_keras_Sequential = None
+_keras_LSTM = None
+_keras_Dense = None
+_keras_Dropout = None
+_keras_BatchNormalization = None
+_keras_Adam = None
+_keras_EarlyStopping = None
+_keras_ReduceLROnPlateau = None
 
 # Configuration
-from config.settings import settings, BusinessConstants
-from utils.logger import setup_logger
-from data_ingestion.external_data import WeatherDataCollector, SocialMediaAnalyzer
+from src.config.settings import settings, BusinessConstants
+from src.utils.logger import setup_logger
+try:
+    from src.data_ingestion.external_data import WeatherDataCollector, SocialMediaAnalyzer
+except Exception:
+    # Fallback lightweight stubs when external_data module is missing (allows app to start)
+    class WeatherDataCollector:
+        def __init__(self):
+            pass
+        def get_historical_data(self, start_date, end_date):
+            import pandas as _pd
+            return _pd.DataFrame()
+
+    class SocialMediaAnalyzer:
+        def __init__(self):
+            pass
+        def get_product_sentiment(self, product_id, start_date, end_date):
+            import pandas as _pd
+            return _pd.DataFrame()
 
 logger = setup_logger(__name__)
 
@@ -84,7 +106,7 @@ class DemandForecaster:
                     product_id = model_file.stem
                     self.models['xgboost'][product_id] = joblib.load(model_file)
             
-            # Chargement des modèles LSTM
+            # Chargement des modèles LSTM (load via tensorflow.keras only when available)
             lstm_path = model_paths["lstm"]
             if lstm_path.exists():
                 self.models['lstm'] = {}
@@ -93,7 +115,12 @@ class DemandForecaster:
                         product_id = model_dir.name
                         model_file = model_dir / "model.h5"
                         if model_file.exists():
-                            self.models['lstm'][product_id] = load_model(str(model_file))
+                            try:
+                                # import tensorflow keras loader at runtime
+                                from tensorflow.keras.models import load_model as _tf_load_model
+                                self.models['lstm'][product_id] = _tf_load_model(str(model_file))
+                            except Exception as e:
+                                logger.warning(f"Impossible de charger LSTM pour {product_id}: {e}")
             
             # Chargement des scalers et encoders
             scalers_path = model_paths["prophet"].parent / "scalers"
@@ -178,7 +205,7 @@ class DemandForecaster:
         
         return df
     
-    def train_prophet_model(self, data: pd.DataFrame, product_id: str) -> Prophet:
+    def train_prophet_model(self, data: pd.DataFrame, product_id: str) -> Any:
         """Entraîne un modèle Prophet pour un produit"""
         # Préparation des données pour Prophet
         prophet_data = data.reset_index()[['date', 'demand']].rename(
@@ -186,7 +213,12 @@ class DemandForecaster:
         )
         
         # Configuration du modèle Prophet
-        model = Prophet(
+        try:
+            from prophet import Prophet as _Prophet
+        except Exception as e:
+            raise RuntimeError("Prophet is not available in the environment") from e
+
+        model = _Prophet(
             yearly_seasonality=True,
             weekly_seasonality=True,
             daily_seasonality=False,
@@ -208,7 +240,7 @@ class DemandForecaster:
         
         return model
     
-    def train_xgboost_model(self, data: pd.DataFrame, product_id: str) -> xgb.XGBRegressor:
+    def train_xgboost_model(self, data: pd.DataFrame, product_id: str) -> Any:
         """Entraîne un modèle XGBoost pour un produit"""
         # Préparation des features
         feature_cols = [col for col in data.columns if col != 'demand']
@@ -216,6 +248,11 @@ class DemandForecaster:
         y = data['demand']
         
         # Configuration du modèle XGBoost
+        try:
+            import xgboost as xgb
+        except Exception as e:
+            raise RuntimeError("xgboost is not available in the environment") from e
+
         model = xgb.XGBRegressor(
             n_estimators=500,
             max_depth=6,
@@ -257,9 +294,18 @@ class DemandForecaster:
         
         return model
     
-    def train_lstm_model(self, data: pd.DataFrame, product_id: str) -> tf.keras.Model:
+    def train_lstm_model(self, data: pd.DataFrame, product_id: str) -> Any:
         """Entraîne un modèle LSTM pour un produit"""
         # Préparation des données pour LSTM
+        try:
+            import tensorflow as tf
+            from tensorflow.keras.models import Sequential
+            from tensorflow.keras.layers import LSTM, Dense, Dropout, BatchNormalization
+            from tensorflow.keras.optimizers import Adam
+            from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
+        except Exception as e:
+            raise RuntimeError("TensorFlow/Keras is not available in the environment") from e
+
         scaler = StandardScaler()
         scaled_data = scaler.fit_transform(data[['demand']])
         
@@ -282,14 +328,14 @@ class DemandForecaster:
             LSTM(100, return_sequences=True, input_shape=(self.lookback_window, 1)),
             Dropout(0.2),
             BatchNormalization(),
-            
+
             LSTM(100, return_sequences=True),
             Dropout(0.2),
             BatchNormalization(),
-            
+
             LSTM(50, return_sequences=False),
             Dropout(0.2),
-            
+
             Dense(25),
             Dense(1)
         ])

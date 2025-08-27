@@ -11,14 +11,25 @@ from typing import Dict, List, Any, Callable, Optional
 from dataclasses import dataclass, asdict
 import uuid
 
-# Kafka
-from kafka import KafkaProducer, KafkaConsumer
-from kafka.errors import KafkaError
-import kafka
+# Kafka: import lazily to avoid import-time issues with vendored dependencies
+def _get_kafka():
+    try:
+        import kafka as _kafka
+        return _kafka
+    except Exception as e:
+        logger = None
+        try:
+            # logger may not be defined yet; import minimal logging
+            import logging as _logging
+            logger = _logging.getLogger(__name__)
+            logger.warning("kafka-python import failed: %s", e)
+        except Exception:
+            pass
+        return None
 
 # Configuration
-from config.settings import settings
-from utils.logger import setup_logger
+from src.config.settings import settings
+from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
@@ -63,7 +74,13 @@ class KafkaProducerManager:
     async def initialize(self):
         """Initialise le producteur Kafka"""
         try:
-            self.producer = KafkaProducer(
+            k = _get_kafka()
+            if k is None:
+                logger.warning("kafka-python not available; Kafka producer will be disabled")
+                self.producer = None
+                return
+
+            self.producer = k.KafkaProducer(
                 bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
                 value_serializer=lambda v: v.encode('utf-8'),
                 key_serializer=lambda k: k.encode('utf-8') if k else None,
@@ -76,7 +93,8 @@ class KafkaProducerManager:
             logger.info("✅ Producteur Kafka initialisé")
         except Exception as e:
             logger.error(f"❌ Erreur initialisation producteur Kafka: {e}")
-            raise
+            # Do not raise to allow the app to continue even if Kafka isn't available
+            self.producer = None
     
     async def send_message(self, topic_type: str, message: DataMessage, key: str = None):
         """Envoie un message vers un topic spécifique"""
@@ -128,8 +146,14 @@ class KafkaConsumerManager:
         try:
             topics = settings.get_kafka_topics()
             
+            k = _get_kafka()
+            if k is None:
+                logger.warning("kafka-python not available; Kafka consumers will be disabled")
+                self.consumers = {}
+                return
+
             for topic in topics:
-                consumer = KafkaConsumer(
+                consumer = k.KafkaConsumer(
                     topic,
                     bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
                     value_deserializer=lambda m: m.decode('utf-8'),
@@ -138,13 +162,14 @@ class KafkaConsumerManager:
                     enable_auto_commit=True,
                     auto_offset_reset='latest'
                 )
-                
+
                 self.consumers[topic] = consumer
                 logger.info(f"✅ Consommateur créé pour topic: {topic}")
             
         except Exception as e:
             logger.error(f"❌ Erreur initialisation consommateurs: {e}")
-            raise
+            # Do not raise; keep consumers empty so the app can continue without Kafka
+            self.consumers = {}
     
     def register_handler(self, topic_pattern: str, handler: Callable[[DataMessage], Any]):
         """Enregistre un handler pour un type de topic"""
@@ -154,21 +179,25 @@ class KafkaConsumerManager:
         """Démarre l'écoute des topics"""
         if not self.consumers:
             await self.initialize()
-        
+
+        if not self.consumers:
+            logger.info("Kafka consumers are disabled; skipping Kafka start")
+            return
+
         self.running = True
-        
+
         # Création des tâches d'écoute pour chaque topic
         tasks = []
         for topic, consumer in self.consumers.items():
             task = asyncio.create_task(self._consume_topic(topic, consumer))
             tasks.append(task)
-        
+
         logger.info(f"🎧 Écoute démarrée sur {len(tasks)} topics")
-        
+
         # Attendre que toutes les tâches se terminent
         await asyncio.gather(*tasks)
     
-    async def _consume_topic(self, topic: str, consumer: KafkaConsumer):
+    async def _consume_topic(self, topic: str, consumer: Any):
         """Consomme les messages d'un topic spécifique"""
         logger.info(f"🎯 Écoute démarrée sur topic: {topic}")
         
@@ -229,7 +258,7 @@ class IoTDataSimulator:
     Génère des données réalistes de capteurs
     """
     
-    def __init__(self, producer_manager: KafkaProducerManager):
+    def __init__(self, producer_manager: 'KafkaProducerManager'):
         self.producer = producer_manager
         self.running = False
         

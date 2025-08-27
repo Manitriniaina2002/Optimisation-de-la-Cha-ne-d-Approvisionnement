@@ -20,17 +20,28 @@ from sklearn.ensemble import IsolationForest, RandomForestClassifier
 from sklearn.preprocessing import StandardScaler, RobustScaler
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, confusion_matrix
-import xgboost as xgb
 
-# Deep Learning pour séries temporelles
-import tensorflow as tf
-from tensorflow.keras.models import Sequential, Model
-from tensorflow.keras.layers import LSTM, Dense, Dropout, Input, Conv1D, MaxPooling1D, Flatten
-from tensorflow.keras.optimizers import Adam
+# Heavy ML libraries are imported lazily inside methods to avoid import-time
+# side-effects (dask/xgboost import issues) when the server starts.
+
+def _get_xgboost():
+    try:
+        import importlib
+        return importlib.import_module('xgboost')
+    except Exception:
+        return None
+
+
+def _get_tensorflow():
+    try:
+        import importlib
+        return importlib.import_module('tensorflow')
+    except Exception:
+        return None
 
 # Configuration
-from config.settings import settings, BusinessConstants
-from utils.logger import setup_logger
+from src.config.settings import settings, BusinessConstants
+from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
@@ -554,30 +565,45 @@ class MaintenancePredictor:
                 anomaly_detector.fit(X_train_scaled)
                 
                 # Entraînement du prédicteur de pannes
-                if len(np.unique(y)) > 1:
-                    # Classification si on a des labels de panne
-                    failure_predictor = xgb.XGBClassifier(
-                        n_estimators=100,
-                        max_depth=6,
-                        learning_rate=0.1,
-                        random_state=42
-                    )
-                    failure_predictor.fit(X_train_scaled, y_train)
-                    
-                    # Évaluation
-                    y_pred = failure_predictor.predict(X_test_scaled)
-                    logger.info(f"Précision {equipment_type}: {(y_pred == y_test).mean():.3f}")
-                else:
-                    # Régression pour prédire le temps avant panne
-                    failure_predictor = xgb.XGBRegressor(
-                        n_estimators=100,
-                        max_depth=6,
-                        learning_rate=0.1,
-                        random_state=42
-                    )
-                    # Simulation de temps avant panne
-                    time_to_failure = np.random.exponential(500, size=len(y_train))
-                    failure_predictor.fit(X_train_scaled, time_to_failure)
+                xgb_mod = _get_xgboost()
+                if xgb_mod is not None:
+                    try:
+                        if len(np.unique(y)) > 1:
+                            failure_predictor = xgb_mod.XGBClassifier(
+                                n_estimators=100,
+                                max_depth=6,
+                                learning_rate=0.1,
+                                random_state=42
+                            )
+                            failure_predictor.fit(X_train_scaled, y_train)
+                            y_pred = failure_predictor.predict(X_test_scaled)
+                            logger.info(f"Précision {equipment_type}: {(y_pred == y_test).mean():.3f}")
+                        else:
+                            failure_predictor = xgb_mod.XGBRegressor(
+                                n_estimators=100,
+                                max_depth=6,
+                                learning_rate=0.1,
+                                random_state=42
+                            )
+                            time_to_failure = np.random.exponential(500, size=len(y_train))
+                            failure_predictor.fit(X_train_scaled, time_to_failure)
+                    except Exception as e:
+                        logger.warning(f"xgboost training failed, falling back to sklearn for {equipment_type}: {e}")
+                        xgb_mod = None
+
+                if xgb_mod is None:
+                    # Fallback to sklearn models when xgboost isn't available
+                    if len(np.unique(y)) > 1:
+                        failure_predictor = RandomForestClassifier(n_estimators=100, random_state=42)
+                        failure_predictor.fit(X_train_scaled, y_train)
+                        y_pred = failure_predictor.predict(X_test_scaled)
+                        logger.info(f"Précision (RF) {equipment_type}: {(y_pred == y_test).mean():.3f}")
+                    else:
+                        # Use a simple RandomForest regressor as fallback
+                        from sklearn.ensemble import RandomForestRegressor
+                        failure_predictor = RandomForestRegressor(n_estimators=100, random_state=42)
+                        time_to_failure = np.random.exponential(500, size=len(y_train))
+                        failure_predictor.fit(X_train_scaled, time_to_failure)
                 
                 # Sauvegarde des modèles
                 self.models[equipment_type] = failure_predictor

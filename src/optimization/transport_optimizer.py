@@ -15,18 +15,47 @@ from concurrent.futures import ThreadPoolExecutor
 import math
 
 # Optimisation
-from ortools.constraint_solver import routing_enums_pb2
-from ortools.constraint_solver import pywrapcp
+import importlib
 import networkx as nx
 from scipy.optimize import minimize
 from sklearn.cluster import KMeans
 
 # Configuration
-from config.settings import settings, BusinessConstants
-from utils.logger import setup_logger
-from data_ingestion.external_data import TrafficDataCollector, WeatherDataCollector
+from src.config.settings import settings, BusinessConstants
+from src.utils.logger import setup_logger
+try:
+    from src.data_ingestion.external_data import TrafficDataCollector, WeatherDataCollector
+except Exception:
+    class TrafficDataCollector:
+        def __init__(self):
+            pass
+        async def initialize(self):
+            return
+        async def get_traffic_factor(self, origin, destination, departure_time):
+            return 1.0
+
+    class WeatherDataCollector:
+        def __init__(self):
+            pass
+        async def initialize(self):
+            return
+        async def get_weather_impact(self, destination, departure_time):
+            return 1.0
 
 logger = setup_logger(__name__)
+
+
+def _get_ortools():
+    """Lazy-import OR-Tools modules used for routing.
+
+    Returns a tuple (routing_enums_pb2, pywrapcp) or (None, None) if import fails.
+    """
+    try:
+        routing_enums_pb2 = importlib.import_module('ortools.constraint_solver.routing_enums_pb2')
+        pywrapcp = importlib.import_module('ortools.constraint_solver.pywrapcp')
+        return routing_enums_pb2, pywrapcp
+    except Exception:
+        return None, None
 
 @dataclass
 class DeliveryPoint:
@@ -262,14 +291,20 @@ class TransportOptimizer:
         
         # Préparation des données OR-Tools
         data = self._prepare_ortools_data(delivery_points, vehicles, distance_matrix, time_matrix)
-        
+
+        # Lazy-import OR-Tools
+        routing_enums_pb2, pywrapcp = _get_ortools()
+        if routing_enums_pb2 is None or pywrapcp is None:
+            logger.warning("OR-Tools n'est pas disponible; retour d'une solution vide")
+            return []
+
         # Création du gestionnaire de routage
         manager = pywrapcp.RoutingIndexManager(
             len(data['distance_matrix']),
             len(data['vehicles']),
             data['depot']
         )
-        
+
         # Création du modèle de routage
         routing = pywrapcp.RoutingModel(manager)
         
@@ -396,9 +431,9 @@ class TransportOptimizer:
     def _extract_routes(
         self,
         data: Dict[str, Any],
-        manager: pywrapcp.RoutingIndexManager,
-        routing: pywrapcp.RoutingModel,
-        solution: pywrapcp.Assignment,
+        manager: Any,
+        routing: Any,
+        solution: Any,
         delivery_points: List[DeliveryPoint],
         vehicles: List[Vehicle]
     ) -> List[Route]:

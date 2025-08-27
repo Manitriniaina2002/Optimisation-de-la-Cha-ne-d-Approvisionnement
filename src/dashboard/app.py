@@ -15,8 +15,8 @@ import asyncio
 from typing import Dict, List, Any
 
 # Configuration
-from config.settings import settings
-from utils.logger import setup_logger
+from src.config.settings import settings
+from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 

@@ -14,9 +14,9 @@ from dataclasses import dataclass
 import json
 
 # Configuration
-from config.settings import settings
-from utils.logger import setup_logger
-from data_ingestion.kafka_consumer import DataMessage
+from src.config.settings import settings
+from src.utils.logger import setup_logger
+from src.data_ingestion.kafka_consumer import DataMessage
 
 logger = setup_logger(__name__)
 
@@ -271,7 +271,7 @@ class StreamProcessor:
                 return
             
             # Simulation d'équipement pour l'analyse
-            from ml_models.predictive_maintenance import Equipment
+            from src.ml_models.predictive_maintenance import Equipment
             equipment = Equipment(
                 id=equipment_id,
                 name=f"Equipment {equipment_id}",
@@ -286,7 +286,7 @@ class StreamProcessor:
             )
             
             # Conversion en SensorReading
-            from ml_models.predictive_maintenance import SensorReading
+            from src.ml_models.predictive_maintenance import SensorReading
             sensor_readings = []
             
             for reading in recent_data:

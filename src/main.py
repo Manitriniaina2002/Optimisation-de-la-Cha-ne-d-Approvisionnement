@@ -11,15 +11,35 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from contextlib import asynccontextmanager
 
-from config.settings import settings
-from api.routes import api_router
-from data_ingestion.kafka_consumer import KafkaConsumerManager
-from real_time.stream_processor import StreamProcessor
-from ml_models.demand_forecasting import DemandForecaster
-from optimization.transport_optimizer import TransportOptimizer
-from ml_models.predictive_maintenance import MaintenancePredictor
-from dashboard.app import create_dash_app
-from utils.logger import setup_logger
+# Compatibility shim: ensure 'kafka.vendor.six.moves' is importable.
+# Some vendored six implementations expose 'moves' lazily; register it
+# in sys.modules early so kafka.codec can import 'kafka.vendor.six.moves'.
+import importlib
+import sys
+try:
+    kv_six = importlib.import_module('kafka.vendor.six')
+    if hasattr(kv_six, 'moves'):
+        sys.modules.setdefault('kafka.vendor.six.moves', kv_six.moves)
+    else:
+        # fallback to the system six.moves if available
+        try:
+            system_moves = importlib.import_module('six.moves')
+            sys.modules.setdefault('kafka.vendor.six.moves', system_moves)
+        except Exception:
+            pass
+except Exception:
+    # If kafka or vendored six isn't available yet, we'll let later imports fail
+    pass
+
+from src.config.settings import settings
+from src.api.routes import api_router
+from src.data_ingestion.kafka_consumer import KafkaConsumerManager
+from src.real_time.stream_processor import StreamProcessor
+from src.ml_models.demand_forecasting import DemandForecaster
+from src.optimization.transport_optimizer import TransportOptimizer
+from src.ml_models.predictive_maintenance import MaintenancePredictor
+from src.dashboard.app import create_dash_app
+from src.utils.logger import setup_logger
 
 # Configuration du logging
 logger = setup_logger(__name__)
@@ -206,7 +226,7 @@ if __name__ == "__main__":
         
         # Démarrage de l'API FastAPI
         uvicorn.run(
-            "main:app",
+            "src.main:app",
             host=settings.API_HOST,
             port=settings.API_PORT,
             reload=settings.DEBUG,
