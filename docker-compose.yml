@@ -1,5 +1,4 @@
 version: "3.8"
-
 services:
   # Base de données PostgreSQL
   postgres:
@@ -212,4 +211,5 @@ volumes:
 
 networks:
   supply_chain_network:
+    driver: bridge
     driver: bridge

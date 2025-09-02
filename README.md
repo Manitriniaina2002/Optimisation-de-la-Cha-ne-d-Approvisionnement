@@ -199,6 +199,33 @@ Accéder au dashboard principal : http://localhost:8050
 
 Pour questions et support : [votre-email@domain.com]
 
+## 🧪 Run frontend + backend locally
+
+Development tip: the frontend is configured to use a Vite dev-server proxy that forwards `/api` to the backend running on http://localhost:8000.
+
+1. Start the backend (from repo root) using the provided launcher which ensures the correct PYTHONPATH and venv Python are used:
+
+```powershell
+# Activate venv (if not already active)
+.venv\Scripts\Activate.ps1
+
+# Start backend with reloader
+powershell -NoProfile -ExecutionPolicy Bypass -File .\run.ps1
+```
+
+2. Start the frontend dev server (it reads `frontend/.env` where `VITE_API_BASE=/api`):
+
+```powershell
+cd frontend
+npm install   # first time only
+npm run dev
+```
+
+3. Open the app at http://localhost:3000. API calls to `/api/*` will be proxied to http://localhost:8000/api/v1 by the Vite proxy.
+
+If you prefer the frontend to call the backend directly, set `VITE_API_BASE` to `http://localhost:8000/api/v1` in `frontend/.env`.
+
+
 ## 📄 Licence
 
 Ce projet est sous licence MIT - voir le fichier [LICENSE](LICENSE) pour plus de détails.

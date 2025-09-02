@@ -9,7 +9,8 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+  // use IPv4 loopback to avoid IPv6 (::1) connection issues on some Windows setups
+  target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         secure: false,
       }

@@ -188,6 +188,9 @@ function Dashboard() {
               {apiConnected ? 'SYSTÈME OPÉRATIONNEL' : 'HORS LIGNE'}
             </span>
           </div>
+          <div className="ml-4 flex items-center space-x-3">
+            <HealthCheck />
+          </div>
         </div>
       </div>
 
@@ -440,3 +443,45 @@ function Dashboard() {
 }
 
 export default Dashboard
+
+function HealthCheck() {
+  const [checking, setChecking] = React.useState(false)
+  const [status, setStatus] = React.useState(null)
+  const [lastChecked, setLastChecked] = React.useState(null)
+
+  const runCheck = async () => {
+    setChecking(true)
+    try {
+      const res = await generalAPI.checkHealth()
+      setStatus(res)
+      setLastChecked(new Date().toLocaleTimeString())
+    } catch (e) {
+      setStatus({ error: e.message || 'Erreur' })
+      setLastChecked(new Date().toLocaleTimeString())
+    } finally {
+      setChecking(false)
+    }
+  }
+
+  return (
+    <div className="flex items-center space-x-3">
+      <button
+        onClick={runCheck}
+        className={`px-3 py-2 rounded-lg font-semibold text-sm ${checking ? 'bg-gray-300 text-gray-700' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
+        disabled={checking}
+      >
+        {checking ? 'Vérification...' : 'Vérifier API'}
+      </button>
+      <div className="text-sm text-gray-700">
+        {status ? (
+          <div className="flex flex-col">
+            <span className="font-medium">{status.status || (status.error ? 'erreur' : 'inconnu')}</span>
+            <span className="text-xs text-gray-500">Dernière vérif: {lastChecked}</span>
+          </div>
+        ) : (
+          <span className="text-xs text-gray-500">Aucune vérif</span>
+        )}
+      </div>
+    </div>
+  )
+}
