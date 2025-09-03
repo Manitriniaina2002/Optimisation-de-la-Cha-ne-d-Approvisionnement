@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { maintenanceAPI } from '../services/api';
 import { Wrench, AlertTriangle, CheckCircle, Clock, TrendingUp, Settings } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ScatterChart, Scatter, PieChart, Pie, Cell } from 'recharts';
 
@@ -60,12 +61,11 @@ const PredictiveMaintenance = () => {
   ];
 
   const healthTrendData = [
-    { date: '01/01', EQ001: 88, EQ002: 75, EQ003: 60, EQ004: 89 },
-    { date: '05/01', EQ001: 87, EQ002: 72, EQ003: 55, EQ004: 90 },
-    { date: '10/01', EQ001: 86, EQ002: 70, EQ003: 50, EQ004: 91 },
-    { date: '15/01', EQ001: 85, EQ002: 68, EQ003: 45, EQ004: 91 },
-    { date: '20/01', EQ001: 85, EQ002: 68, EQ003: 45, EQ004: 91 }
-  ];
+      { date: '05/01', EQ001: 87, EQ002: 72, EQ003: 55, EQ004: 90 },
+      { date: '10/01', EQ001: 86, EQ002: 70, EQ003: 50, EQ004: 91 },
+      { date: '15/01', EQ001: 85, EQ002: 68, EQ003: 45, EQ004: 91 },
+      { date: '20/01', EQ001: 85, EQ002: 68, EQ003: 45, EQ004: 91 }
+    ];
 
   const maintenanceCostsData = [
     { month: 'Oct', preventive: 12000, corrective: 8500, total: 20500 },
@@ -124,8 +124,28 @@ const PredictiveMaintenance = () => {
   ];
 
   useEffect(() => {
-    setEquipmentData(equipmentList);
-    setMaintenanceAlerts(alertsData);
+    let mounted = true
+    ;(async () => {
+      try {
+        const equipment = await maintenanceAPI.getEquipmentHealth()
+        if (mounted && equipment) {
+          // Backend returns { equipment: [...], total: N }
+          setEquipmentData(equipment.equipment || equipment.items || equipmentList)
+          // Backend does not return alerts from this endpoint; keep fallback
+          setMaintenanceAlerts(equipment.alerts || alertsData)
+          return
+        }
+      } catch (err) {
+        // fall back to mock
+      }
+
+      if (mounted) {
+        setEquipmentData(equipmentList)
+        setMaintenanceAlerts(alertsData)
+      }
+    })()
+
+    return () => { mounted = false }
   }, []);
 
   const getStatusColor = (status) => {
@@ -252,14 +272,7 @@ const PredictiveMaintenance = () => {
                     equipment.healthScore >= 60 ? 'bg-yellow-500' : 'bg-red-500'
                   }`}
                   style={{ width: `${equipment.healthScore}%` }}
-                ></div>
-              </div>
-              
-              <div className="text-xs text-gray-500">
-                <div className="flex justify-between">
-                  <span>Efficacité: {equipment.efficiency}%</span>
-                  <span>Temp: {equipment.temperature}°C</span>
-                </div>
+                />
                 <div className="flex justify-between mt-1">
                   <span>Vibration: {equipment.vibration}</span>
                   <span>Pression: {equipment.pressure} bar</span>

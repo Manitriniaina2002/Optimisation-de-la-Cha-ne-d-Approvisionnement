@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Truck, MapPin, Calculator, Clock, DollarSign, Navigation } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
+import { transportAPI } from '../services/api';
 
 const TransportOptimization = () => {
   const [optimizationData, setOptimizationData] = useState({
@@ -53,12 +54,40 @@ const TransportOptimization = () => {
   ];
 
   useEffect(() => {
-    // Simulate data loading
-    setOptimizationData({
-      routes: routesData,
-      costs: { current: 18500, optimized: 13800, savings: 4700 },
-      performance: { onTime: 285, totalDeliveries: 307, efficiency: 92.8 }
-    });
+    // Try fetching real analytics from API, otherwise fall back to mock data
+    let mounted = true
+    ;(async () => {
+      try {
+        const data = await transportAPI.getAnalytics('week')
+        if (mounted && data) {
+          // If backend returned KPIs, map plausible fields into the optimization data
+          const mappedCosts = data.summary || data.costs || { current: 18500, optimized: 13800, savings: 4700 }
+          const mappedPerformance = data.performance || {
+            onTime: data.kpis ? data.kpis.delivery_performance_percent : 285,
+            totalDeliveries: data.kpis ? data.kpis.orders_processed : 307,
+            efficiency: data.kpis ? data.kpis.transport_efficiency : 92.8
+          }
+          setOptimizationData(prev => ({
+            ...prev,
+            routes: data.routes || routesData,
+            costs: mappedCosts,
+            performance: mappedPerformance
+          }))
+          return
+        }
+      } catch (err) {
+        // ignore and fall back
+      }
+
+      if (mounted) {
+        setOptimizationData({
+          routes: routesData,
+          costs: { current: 18500, optimized: 13800, savings: 4700 },
+          performance: { onTime: 285, totalDeliveries: 307, efficiency: 92.8 }
+        })
+      }
+    })()
+    return () => { mounted = false }
   }, []);
 
   const handleInputChange = (e) => {
@@ -70,9 +99,27 @@ const TransportOptimization = () => {
   };
 
   const handleOptimizeRoute = () => {
-    // Simulate route optimization
-    console.log('Optimizing route with:', formData);
-    // Here you would make an API call to your backend
+    // Call backend optimization endpoint
+    (async () => {
+      try {
+        const payload = {
+          delivery_points: [{ start: formData.startLocation, end: formData.endLocation }],
+          vehicles: [{ type: formData.vehicleType, capacity: formData.maxCapacity }],
+          optimization_objectives: { priority: formData.priorityLevel }
+        }
+        const result = await transportAPI.optimizeRoutes(payload.delivery_points, payload.vehicles, payload.optimization_objectives)
+        if (result) {
+          // try to apply returned shape
+          setOptimizationData({
+            routes: result.routes || routesData,
+            costs: result.costs || optimizationData.costs,
+            performance: result.performance || optimizationData.performance
+          })
+        }
+      } catch (err) {
+        console.error('Optimization API failed, using local simulation', err)
+      }
+    })()
   };
 
   const getStatusColor = (status) => {
@@ -323,8 +370,8 @@ const TransportOptimization = () => {
           </table>
         </div>
       </div>
-    </div>
-  );
+      </div>
+    );
 };
 
 export default TransportOptimization;

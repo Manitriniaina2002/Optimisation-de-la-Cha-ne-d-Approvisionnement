@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart3, TrendingUp, Calendar, Target, RefreshCw } from 'lucide-react';
+import { BarChart3, TrendingUp, Calendar, Target, RefreshCw, Download } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ScatterChart, Scatter } from 'recharts';
 import { demandForecastingAPI } from '../services/api';
 
@@ -22,11 +22,35 @@ function DemandForecasting() {
       // Try to get real forecast from API
       try {
         const result = await demandForecastingAPI.getForecast(
-          selectedProduct, 
-          forecastDays, 
+          selectedProduct,
+          forecastDays,
           true
         )
-        setForecast(result)
+
+        // Normalize backend response shapes:
+        // Backend may return { forecast_dates: [...], predictions: { ensemble: [...], prophet: [...], xgboost: [...] }, ... }
+        // Frontend expects forecast.predictions to be an array of { date, ensemble, prophet, xgboost, upper_bound, lower_bound }
+        let normalized = result
+        if (result) {
+          const preds = result.predictions
+          const dates = result.forecast_dates || result.forecastDates || null
+          if (Array.isArray(preds)) {
+            // already in desired shape
+            normalized = result
+          } else if (preds && dates && Array.isArray(dates)) {
+            const arr = dates.map((d, i) => ({
+              date: d,
+              ensemble: preds.ensemble ? preds.ensemble[i] : null,
+              prophet: preds.prophet ? preds.prophet[i] : null,
+              xgboost: preds.xgboost ? preds.xgboost[i] : null,
+              upper_bound: result.upper_bound ? result.upper_bound[i] : null,
+              lower_bound: result.lower_bound ? result.lower_bound[i] : null
+            }))
+            normalized = { ...result, predictions: arr }
+          }
+        }
+
+        setForecast(normalized)
         return
       } catch (apiError) {
         console.error('API call failed, using mock data:', apiError)

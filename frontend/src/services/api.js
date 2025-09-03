@@ -56,9 +56,11 @@ export const demandForecastingAPI = {
   // Get demand analytics
   getAnalytics: async (productId, period = 'week') => {
     try {
-      const response = await api.get(`/demand/analytics`, {
-        params: { product_id: productId, period }
-      });
+  // Backend provides a products list endpoint; if a productId is provided
+  // use it as a category filter for demo purposes.
+  const params = {};
+  if (productId) params.category = productId;
+  const response = await api.get(`/demand/products`, { params });
       return response.data;
     } catch (error) {
       console.error('Error getting demand analytics:', error);
@@ -89,7 +91,9 @@ export const transportAPI = {
   // Get transport analytics
   getAnalytics: async (period = 'week') => {
     try {
-      const response = await api.get('/transport/analytics', {
+      // No dedicated transport analytics endpoint on backend; reuse metrics KPIs
+      // which include transport-related KPIs for the requested period.
+      const response = await api.get('/metrics/kpis', {
         params: { period }
       });
       return response.data;
@@ -102,8 +106,13 @@ export const transportAPI = {
   // Calculate route costs
   calculateCosts: async (routes) => {
     try {
-      const response = await api.post('/transport/calculate-costs', { routes });
-      return response.data;
+  // Backend does not expose a calculate-costs endpoint. For now attempt
+  // to call the optimize endpoint if routes are provided as delivery points
+  // (best-effort mapping). If the payload doesn't match, the caller will
+  // receive the backend error which should be handled upstream.
+  const payload = { routes };
+  const response = await api.post('/transport/optimize', payload);
+  return response.data;
     } catch (error) {
       console.error('Error calculating route costs:', error);
       throw error;
@@ -130,9 +139,10 @@ export const maintenanceAPI = {
   },
 
   // Get maintenance schedule
-  getSchedule: async (equipmentId) => {
+  getSchedule: async (days = 30) => {
     try {
-      const response = await api.get(`/maintenance/schedule/${equipmentId}`);
+      // Backend exposes /maintenance/schedule with a 'days' query parameter
+      const response = await api.get(`/maintenance/schedule`, { params: { days } });
       return response.data;
     } catch (error) {
       console.error('Error getting maintenance schedule:', error);
@@ -143,7 +153,8 @@ export const maintenanceAPI = {
   // Get equipment health
   getEquipmentHealth: async () => {
     try {
-      const response = await api.get('/maintenance/health');
+  // Backend exposes /maintenance/equipment for equipment list/health
+  const response = await api.get('/maintenance/equipment');
       return response.data;
     } catch (error) {
       console.error('Error getting equipment health:', error);
@@ -159,7 +170,8 @@ export const metricsAPI = {
   // Get current system metrics
   getCurrentMetrics: async () => {
     try {
-      const response = await api.get('/metrics/current');
+  // Backend provides a real-time metrics endpoint
+  const response = await api.get('/metrics/real-time');
       return response.data;
     } catch (error) {
       console.error('Error getting current metrics:', error);
@@ -170,9 +182,15 @@ export const metricsAPI = {
   // Get historical metrics
   getHistoricalMetrics: async (period = '24h') => {
     try {
-      const response = await api.get('/metrics/historical', {
-        params: { period }
-      });
+      // Map common period formats to the backend 'period' query parameter
+      let p = 'today';
+      if (typeof period === 'string') {
+        const lp = period.toLowerCase();
+        if (lp.includes('24') || lp === 'today') p = 'today';
+        else if (lp.includes('7') || lp.includes('week')) p = 'week';
+        else if (lp.includes('30') || lp.includes('month')) p = 'month';
+      }
+      const response = await api.get('/metrics/kpis', { params: { period: p } });
       return response.data;
     } catch (error) {
       console.error('Error getting historical metrics:', error);
@@ -183,7 +201,8 @@ export const metricsAPI = {
   // Get system health
   getSystemHealth: async () => {
     try {
-      const response = await api.get('/metrics/health');
+  // Backend exposes system health under /system/health
+  const response = await api.get('/system/health');
       return response.data;
     } catch (error) {
       console.error('Error getting system health:', error);

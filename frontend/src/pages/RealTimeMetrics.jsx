@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Activity, Zap, Users, Package, RefreshCw, BarChart3 } from 'lucide-react';
+import { metricsAPI } from '../services/api';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, BarChart, Bar, ComposedChart } from 'recharts';
 
 const RealTimeMetrics = () => {
@@ -70,7 +71,29 @@ const RealTimeMetrics = () => {
   ]);
 
   useEffect(() => {
-    setRealTimeData(generateRealTimeData());
+    let mounted = true
+    ;(async () => {
+      try {
+        const current = await metricsAPI.getCurrentMetrics()
+        if (mounted && current) {
+          // Backend returns a MetricsResponse shape; map fields safely
+          setRealTimeData(current.recent || current.data || generateRealTimeData())
+          setCurrentKPIs(prev => ({
+            ...prev,
+            throughput: current.orders_per_hour || (current.kpis && current.kpis.orders_processed) || prev.throughput,
+            efficiency: current.overall_efficiency || (current.kpis && current.kpis.transport_efficiency) || prev.efficiency,
+            activeOrders: current.active_alerts_count || prev.activeOrders,
+            alertsCount: current.equipment_alerts || prev.alertsCount,
+            avgResponseTime: prev.avgResponseTime
+          }))
+          return
+        }
+      } catch (err) {
+        // fall back to local generator
+      }
+      if (mounted) setRealTimeData(generateRealTimeData())
+    })()
+    
 
     let interval;
     if (isLive) {
