@@ -281,12 +281,50 @@ async def init_ml_models():
 async def init_databases():
     """Initialise les connexions aux bases de données"""
     try:
-        # Simulation des connexions
-        logger.info("🐘 Connexion à PostgreSQL...")
-        logger.info("🍃 Connexion à MongoDB...")
-        logger.info("🔴 Connexion à Redis...")
-        logger.info("📈 Connexion à InfluxDB...")
-        logger.info("✅ Toutes les bases de données connectées")
+        # Real initialisation: attempt to initialize SQLAlchemy (Postgres), MongoDB, Redis, Influx
+        from src.db.postgres import init_db
+
+        # PostgreSQL (SQLAlchemy async)
+        try:
+            logger.info("🐘 Initialisation PostgreSQL (async)...")
+            await init_db()
+            logger.info("✅ PostgreSQL ready")
+        except Exception as e:
+            logger.warning(f"⚠️ PostgreSQL init failed: {e}")
+
+        # MongoDB (pymongo)
+        try:
+            from pymongo import MongoClient
+            mongo_url = settings.MONGODB_URL
+            logger.info("🍃 Connexion à MongoDB...")
+            mc = MongoClient(mongo_url, serverSelectionTimeoutMS=2000)
+            # trigger a server selection
+            mc.server_info()
+            logger.info("✅ MongoDB reachable")
+        except Exception as e:
+            logger.warning(f"⚠️ MongoDB init failed or not reachable: {e}")
+
+        # Redis
+        try:
+            import redis
+            r = redis.from_url(settings.REDIS_URL)
+            r.ping()
+            logger.info("✅ Redis reachable")
+        except Exception as e:
+            logger.warning(f"⚠️ Redis init failed or not reachable: {e}")
+
+        # InfluxDB
+        try:
+            from influxdb_client import InfluxDBClient
+            logger.info("📈 Connexion à InfluxDB...")
+            influx = InfluxDBClient(url=settings.INFLUXDB_URL, token=settings.INFLUXDB_TOKEN or "", org=settings.INFLUXDB_ORG or "")
+            # simple health check
+            _ = influx.health()
+            logger.info("✅ InfluxDB reachable")
+        except Exception as e:
+            logger.warning(f"⚠️ InfluxDB init failed or not reachable: {e}")
+
+        logger.info("✅ Database initialization attempted (check warnings for failures)")
         
     except Exception as e:
         logger.error(f"❌ Erreur connexion bases de données: {e}")
