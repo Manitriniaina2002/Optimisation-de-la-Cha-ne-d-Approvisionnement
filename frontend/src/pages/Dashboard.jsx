@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react'
-import { dashboardAPI } from '../services/api'
-import { Link } from 'react-router-dom'
 import { 
   TrendingUp, 
   Truck, 
@@ -110,33 +108,6 @@ function Dashboard() {
   const [loading, setLoading] = useState(false)
   const [apiConnected, setApiConnected] = useState(true)
 
-  useEffect(() => {
-    let mounted = true
-    ;(async () => {
-      try {
-        const kpis = await dashboardAPI.getKPIs('today')
-        if (!mounted) return
-        if (kpis) {
-          setMetrics(prev => ({
-            ...prev,
-            // Accept either camelCase or snake_case keys from different backends
-            ordersPerHour: kpis.ordersPerHour ?? kpis.orders_per_hour ?? prev.ordersPerHour,
-            avgOrderValue: kpis.avgOrderValue ?? kpis.avg_order_value ?? prev.avgOrderValue,
-            transportEfficiency: kpis.transportEfficiency ?? kpis.transport_efficiency ?? prev.transportEfficiency,
-            overallEfficiency: kpis.overallEfficiency ?? kpis.overall_efficiency ?? prev.overallEfficiency,
-            totalRevenue: kpis.totalRevenue ?? kpis.total_revenue ?? prev.totalRevenue,
-            predictiveMaintenance: kpis.predictiveMaintenance ?? kpis.predictive_maintenance ?? prev.predictiveMaintenance,
-            alerts: kpis.alerts ?? kpis.alerts_list ?? prev.alerts
-          }))
-        }
-      } catch (err) {
-        console.warn('Dashboard API unavailable, using mock metrics', err)
-        setApiConnected(false)
-      }
-    })()
-    return () => { mounted = false }
-  }, [])
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-cyan-50">
@@ -208,11 +179,11 @@ function Dashboard() {
                   </div>
                   <div>
                     <h3 className="text-2xl font-bold text-gray-800">Intelligence Prédictive</h3>
-                    <p className="text-gray-600 text-sm">Prédictions par réseau neuronal</p>
+                    <p className="text-gray-600 text-sm">Neural Network Forecasting</p>
                   </div>
                 </div>
                 <div className="bg-purple-100 text-purple-700 px-4 py-2 rounded-full text-xs font-bold border border-purple-200">
-                  IA EN DIRECT
+                  LIVE AI
                 </div>
               </div>
               
@@ -277,7 +248,7 @@ function Dashboard() {
                   </div>
                 </div>
                 <div className="bg-emerald-100 text-emerald-700 px-4 py-2 rounded-full text-xs font-bold border border-emerald-200">
-                  OPTIMISÉ
+                  OPTIMIZED
                 </div>
               </div>
               
@@ -440,7 +411,7 @@ function Dashboard() {
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Link to="/demand" className="group relative overflow-hidden bg-gradient-to-br from-blue-500 to-blue-600 text-white p-6 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1">
+              <button className="group relative overflow-hidden bg-gradient-to-br from-blue-500 to-blue-600 text-white p-6 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1">
                 <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 <div className="relative z-10 flex items-center justify-center space-x-3">
                   <TrendingUp className="h-6 w-6" />
@@ -449,9 +420,9 @@ function Dashboard() {
                 <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-all duration-300">
                   <ArrowRight className="w-4 h-4" />
                 </div>
-              </Link>
+              </button>
               
-              <Link to="/transport" className="group relative overflow-hidden bg-gradient-to-br from-emerald-500 to-emerald-600 text-white p-6 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1">
+              <button className="group relative overflow-hidden bg-gradient-to-br from-emerald-500 to-emerald-600 text-white p-6 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1">
                 <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 <div className="relative z-10 flex items-center justify-center space-x-3">
                   <Truck className="h-6 w-6" />
@@ -460,9 +431,9 @@ function Dashboard() {
                 <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-all duration-300">
                   <ArrowRight className="w-4 h-4" />
                 </div>
-              </Link>
+              </button>
               
-              <Link to="/maintenance" className="group relative overflow-hidden bg-gradient-to-br from-purple-500 to-purple-600 text-white p-6 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1">
+              <button className="group relative overflow-hidden bg-gradient-to-br from-purple-500 to-purple-600 text-white p-6 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1">
                 <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 <div className="relative z-10 flex items-center justify-center space-x-3">
                   <Settings className="h-6 w-6" />
@@ -471,7 +442,7 @@ function Dashboard() {
                 <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-all duration-300">
                   <ArrowRight className="w-4 h-4" />
                 </div>
-              </Link>
+              </button>
             </div>
           </div>
         </div>

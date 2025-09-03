@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { maintenanceAPI } from '../services/api';
 import { Wrench, AlertTriangle, CheckCircle, Clock, TrendingUp, Settings } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ScatterChart, Scatter, PieChart, Pie, Cell } from 'recharts';
+import Layout from '../components/Layout'
 
 const PredictiveMaintenance = () => {
   const [equipmentData, setEquipmentData] = useState([]);
@@ -124,28 +124,8 @@ const PredictiveMaintenance = () => {
   ];
 
   useEffect(() => {
-    let mounted = true
-    ;(async () => {
-      try {
-        const equipment = await maintenanceAPI.getEquipmentHealth()
-        if (mounted && equipment) {
-          // Backend returns { equipment: [...], total: N }
-          setEquipmentData(equipment.equipment || equipment.items || equipmentList)
-          // Backend does not return alerts from this endpoint; keep fallback
-          setMaintenanceAlerts(equipment.alerts || alertsData)
-          return
-        }
-      } catch (err) {
-        // fall back to mock
-      }
-
-      if (mounted) {
-        setEquipmentData(equipmentList)
-        setMaintenanceAlerts(alertsData)
-      }
-    })()
-
-    return () => { mounted = false }
+    setEquipmentData(equipmentList);
+    setMaintenanceAlerts(alertsData);
   }, []);
 
   const getStatusColor = (status) => {
@@ -173,7 +153,8 @@ const PredictiveMaintenance = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <Layout>
+      <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Maintenance Prédictive</h1>
@@ -409,7 +390,8 @@ const PredictiveMaintenance = () => {
           </table>
         </div>
       </div>
-    </div>
+      </div>
+    </Layout>
   );
 };
 

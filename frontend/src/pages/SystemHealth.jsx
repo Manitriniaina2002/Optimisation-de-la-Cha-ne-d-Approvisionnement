@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Server, Database, Wifi, Shield, AlertCircle, CheckCircle, Clock, Cpu } from 'lucide-react';
-import { metricsAPI } from '../services/api';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
 
 const SystemHealth = () => {
@@ -133,36 +132,19 @@ const SystemHealth = () => {
   ]);
 
   useEffect(() => {
-    let mounted = true
-    ;(async () => {
-      try {
-        const health = await metricsAPI.getSystemHealth()
-        if (mounted && health) {
-          setComponents(health.components || components)
-          setSecurityEvents(health.securityEvents || securityEvents)
-          setLastUpdate(new Date())
-          return
-        }
-      } catch (err) {
-        // fall back to simulated updates
-      }
+    const interval = setInterval(() => {
+      setLastUpdate(new Date());
+      
+      // Simulate status updates
+      setComponents(prev => prev.map(comp => ({
+        ...comp,
+        responseTime: comp.responseTime + Math.floor(Math.random() * 10 - 5),
+        requestsPerMin: comp.requestsPerMin + Math.floor(Math.random() * 100 - 50),
+        lastCheck: new Date()
+      })));
+    }, 10000);
 
-      const interval = setInterval(() => {
-        setLastUpdate(new Date());
-        
-        // Simulate status updates
-        setComponents(prev => prev.map(comp => ({
-          ...comp,
-          responseTime: comp.responseTime + Math.floor(Math.random() * 10 - 5),
-          requestsPerMin: comp.requestsPerMin + Math.floor(Math.random() * 100 - 50),
-          lastCheck: new Date()
-        })));
-      }, 10000);
-
-      return () => clearInterval(interval);
-    })()
-    
-    return () => { mounted = false }
+    return () => clearInterval(interval);
   }, []);
 
   const getStatusColor = (status) => {
@@ -203,7 +185,8 @@ const SystemHealth = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <Layout>
+      <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Santé du Système</h1>
@@ -486,7 +469,8 @@ const SystemHealth = () => {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </Layout>
   );
 };
 

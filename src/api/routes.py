@@ -4,7 +4,7 @@ Endpoints pour toutes les fonctionnalités d'optimisation
 """
 
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Query
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPBearer
 from pydantic import BaseModel, Field
 from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
@@ -20,27 +20,13 @@ logger = setup_logger(__name__)
 api_router = APIRouter()
 security = HTTPBearer()
 
-async def get_current_user(token: HTTPAuthorizationCredentials = Depends(security)):
-        """Authentification simple (à remplacer par une vraie auth)
-
-        Notes:
-        - HTTPBearer dependency returns an HTTPAuthorizationCredentials object with
-            attributes `.scheme` and `.credentials`.
-        - For the demo environment we accept the demo token or any token that
-            begins with 'demo'. This helper reads `.credentials` safely to avoid
-            AttributeError when called by FastAPI.
-        """
-        try:
-                creds = token.credentials if hasattr(token, 'credentials') else token
-                # Accept demo token or any bearer token that starts with 'demo'
-                if isinstance(creds, str) and (creds == "demo-token" or creds.startswith("demo")):
-                        return {"user_id": "demo_user"}
-        except Exception:
-                # In case of unexpected token shapes, fall back to demo user for local dev
-                return {"user_id": "demo_user"}
-
-        # For demo purposes, accept any token (keep permissive for development)
+async def get_current_user(token: str = Depends(security)):
+    """Authentification simple (à remplacer par une vraie auth)"""
+    # Accept demo token or bypass auth for demo
+    if token == "demo-token" or token.startswith("Bearer demo"):
         return {"user_id": "demo_user"}
+    # For demo purposes, also accept any token
+    return {"user_id": "demo_user"}
 
 async def get_optional_user(authorization: str = None):
     """Authentification optionnelle pour demo"""
